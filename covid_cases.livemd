@@ -1,0 +1,140 @@
+# Quebec/Ontario covid stats over the last X days
+
+## Install Deps
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+Mix.install([:httpoison, :jason, :kino, :vega_lite])
+```
+
+## Inputs
+
+### Province selection
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+provinces = [qc: "Quebec", on: "Ontario"]
+province_input = Kino.Input.select("Please Select Province", provinces)
+```
+
+### Number of days selection
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+day_input = Kino.Input.number("How many days should we look at?")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+defmodule CovidCases do
+  def endpoint(province), do: "https://api.covid19tracker.ca/reports/province/#{province}"
+
+  def case_counts(province, num_days) do
+    url = endpoint(province)
+    {:ok, %{body: body}} = HTTPoison.get(url)
+    data = Jason.decode!(body)["data"]
+
+    data
+    |> Enum.reverse()
+    |> Enum.take(num_days)
+  end
+
+  alias VegaLite, as: Vl
+
+  def graph_setup(graph_title, y_axis_title) do
+    Vl.new(
+      title: graph_title,
+      width: 800,
+      height: 400
+    )
+    |> Vl.mark(:line)
+    |> Vl.encode_field(:x, "date", type: :temporal)
+    |> Vl.encode_field(:y, y_axis_title, type: :quantitative)
+    |> Kino.VegaLite.new()
+    |> Kino.render()
+  end
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+province = Kino.Input.read(province_input)
+day_count = Kino.Input.read(day_input)
+```
+
+## Get the Covid Case Data
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+case_counts = CovidCases.case_counts(province, day_count)
+```
+
+## Displaying Case Data
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+case_graph =
+  CovidCases.graph_setup(
+    "New Covid-19 cases in #{province} over the last #{day_count} days",
+    "change_cases"
+  )
+
+Enum.each(case_counts, &Kino.VegaLite.push(case_graph, &1))
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+Kino.DataTable.new(case_counts, keys: ["date", "change_cases"])
+```
+
+<!-- livebook:{"branch_parent_index":3} -->
+
+## Displaying Hospitalization Data
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+hospitalizations_graph =
+  CovidCases.graph_setup(
+    "Total number of Covid-19 hospitalizations in #{province} over the last #{day_count} days",
+    "total_hospitalizations"
+  )
+
+Enum.each(case_counts, &Kino.VegaLite.push(hospitalizations_graph, &1))
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+Kino.DataTable.new(case_counts, keys: ["date", "total_hospitalizations"])
+```
+
+<!-- livebook:{"branch_parent_index":3} -->
+
+## Displaying Fatalities Data
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+fatalities_graph =
+  CovidCases.graph_setup(
+    "Total number of daily Covid-19 fatalities in #{province} over the last #{day_count} days",
+    "change_fatalities"
+  )
+
+Enum.each(case_counts, &Kino.VegaLite.push(fatalities_graph, &1))
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+Kino.DataTable.new(case_counts, keys: ["date", "change_fatalities"])
+```
